@@ -1,0 +1,18 @@
+data:
+  data_path: './car_models'
+
+mode:
+  train: yes
+  val: yes
+  test: no
+
+train:
+  no_cuda: no
+  batch_size: 2
+
+val:
+  batch_size: 2
+
+test:
+  no_cuda: no
+  batch_size: 2
