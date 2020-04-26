@@ -1,18 +1,27 @@
 data:
-  data_path: './car_models'
-
+  data_path: '../KITTI'
+  dataset: 'KITTI'
 mode:
-  train: yes
-  val: yes
-  test: no
+  train: no
+  val: no
+  test: yes
 
 train:
   no_cuda: no
-  batch_size: 2
-
+  batch_size: 1
+  model:
+    backbone: 'MaskRCNN'
+    pose_net:
+    shape_net:
+    renderer:
 val:
-  batch_size: 2
+  batch_size: 1
 
 test:
   no_cuda: no
-  batch_size: 2
+  batch_size: 1
+  model: 
+    backbone: 'MaskRCNN'
+    pose_net:
+    shape_net:
+    renderer:
