@@ -6,11 +6,10 @@ from torch.utils.data import Dataset
 
 #Misc imports
 import matplotlib.pyplot as plt
-from skimage import img_as_ubyte
 import logging
 import os
 import numpy as np
-
+import cv2
 
 #Pytorch3d imports
 from pytorch3d.io import load_obj
@@ -22,6 +21,7 @@ from utils import str_to_class
 
 
 def get_dataset(name,mode,data_path,device):
+  mode = 'train' if mode == 'val' else 'train'
   class_ = str_to_class(name,'data_loader')
   instance = class_(mode,data_path,device)
   return instance or None
@@ -31,29 +31,55 @@ class KITTI(Dataset):
   def __init__(self,mode,data_path,device):
     self.mode = mode
     self.data_path = data_path
-    self.device = device 
-    self.image_data = []
-    self.label_data = []
-    self.calib_data = []
-    
-    image_path = os.path.join(data_path,data_object_image_2,mode + 'ing','image_2')
-    image_samples = os.listdir(image_path)
-    calib_path = os.path.join(data_path,data_object_calib,mode + 'ing',c'calib')
-    calib_samples = os.listdir(calib_path)
-    if mode == 'train':
-      label_path = os.path.join(data_path,data_object_label_2,'training','label_2')
-      label_samples = os.listdir(label_path)
-
-    for image, calib in zip(): 
-      if image_samples.endswith('.png'):
+    self.device = device
+    self.data = dict()
         
+    image_path = os.path.join(data_path,'data_object_image_2',mode + 'ing','image_2/')
+    image_samples = os.listdir(image_path)
+    image_data = [os.path.join(data_path,'data_object_image_2',mode + 'ing','image_2/') + s for s in sorted(image_samples)]
+    self.data['image'] = image_data
 
+    calib_path = os.path.join(data_path,'data_object_calib',mode + 'ing','calib/')
+    calib_samples = os.listdir(calib_path)
+    calib_data = [os.path.join(data_path,'data_object_calib',mode + 'ing','calib/') + s for s in sorted(calib_samples)]
+    self.data['calib'] = calib_data
+    
+    if mode == 'train':
+      label_path = os.path.join(data_path,'data_object_label_2','training','label_2/')
+      label_samples = os.listdir(label_path)
+      label_data = [os.path.join(data_path,'data_object_label_2','training','label_2/') + s for s in sorted(label_samples)]
+      self.data['label'] = label_data
 
-  def __getitem__(self,x):
+      depth_path = os.path.join(data_path,'depth_2_multiscale/')
+      depth_samples = os.listdir(depth_path)
+      depth_data = [os.path.join(data_path,'depth_2_multiscale/') + s for s in sorted(depth_samples)]
+      self.data['depth'] = depth_data
+    
+    
 
+  def __getitem__(self,idx):
+    input_data = {'image':None,'depth':None,'calib':None,'label':None}
+    image_path = self.data['image'][idx]
+    calib_path = self.data['calib'][idx]
+    input_data['image'] = torch.from_numpy(np.array(cv2.imread(image_path)))#.permute(2,0,1)
+    input_data['calib'] = self.load_calib(calib_path)
+
+    if self.mode == 'train':
+      label_path = self.data['label'][idx]
+      depth_path = self.data['depth'][idx]      
+      input_data['label'] =  self.load_label(label_path)
+      #the depth is pre-processed, so we just load it from png format
+      input_data['depth'] = torch.from_numpy(np.array(cv2.imread(depth_path)))#.permute(2,0,1)
+    return input_data
+
+  def load_calib(self,calib_path):
+    return None
+
+  def load_label(self,label_path):
+    return None
 
   def __len__(self):
-
+    return len(self.data['image'])
 
 
 class Cars_3D(Dataset):
@@ -79,3 +105,4 @@ class Cars_3D(Dataset):
  
   def __len__(self):
     return len(self.data)
+
