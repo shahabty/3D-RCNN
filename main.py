@@ -23,8 +23,8 @@ if __name__ == '__main__':
   if mode == 'train':
     train_dataset = get_dataset(name = cfg['data']['dataset'], mode = 'train',data_path = cfg['data']['data_path'],device = device)
     val_dataset = get_dataset(name = cfg['data']['dataset'], mode = 'val',data_path = cfg['data']['data_path'],device = device)
-    train_loader = DataLoader(train_dataset,batch_size=cfg['train']['batch_size'], collate_fn = collate_fn_maskrcnn,num_workers=0, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=cfg['val']['batch_size'], collate_fn = collate_fn_maskrcnn,num_workers=0, shuffle=True)
+    train_loader = DataLoader(train_dataset,batch_size=cfg['train']['batch_size'], collate_fn = collate_fn_3D,num_workers=0, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=cfg['val']['batch_size'], collate_fn = collate_fn_3D,num_workers=0, shuffle=True)
     
     renderer = get_renderer(name = cfg['train']['model']['renderer'],device = device)
     model = get_model(model = cfg['train']['model'],renderer = renderer,device = device)
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     trainer.run()
   else:
     test_dataset = get_dataset(name = cfg['data']['dataset'],mode = 'test',data_path = cfg['data']['data_path'],device = device)
-    test_loader = DataLoader(test_dataset,batch_size=cfg['test']['batch_size'], collate_fn = collate_fn_maskrcnn,num_workers=0, shuffle=True)
+    test_loader = DataLoader(test_dataset,batch_size=cfg['test']['batch_size'], collate_fn = collate_fn_3D,num_workers=0, shuffle=True)
 
     renderer = get_renderer(name = cfg['test']['model']['renderer'],device = device)
     model = get_model(model = cfg['test']['model'],renderer = renderer,device = device)

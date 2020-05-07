@@ -12,7 +12,7 @@ import numpy as np
 import cv2
 
 #Pytorch3d imports
-from pytorch3d.io import load_obj
+from pytorch3d.io import load_obj,load_objs_as_meshes
 from pytorch3d.structures import Meshes, Textures
 from pytorch3d.transforms import Rotate, Translate
 
@@ -53,9 +53,7 @@ class KITTI(Dataset):
       depth_path = os.path.join(data_path,'depth_2_multiscale/')
       depth_samples = os.listdir(depth_path)
       depth_data = [os.path.join(data_path,'depth_2_multiscale/') + s for s in sorted(depth_samples)]
-      self.data['depth'] = depth_data
-    
-    
+      self.data['depth'] = depth_data    
 
   def __getitem__(self,idx):
     input_data = {'image':None,'depth':None,'calib':None,'label':None}
@@ -72,15 +70,31 @@ class KITTI(Dataset):
       input_data['depth'] = torch.from_numpy(np.array(cv2.imread(depth_path)))#.permute(2,0,1)
     return input_data
 
-  def load_calib(self,calib_path):
-    return None
+  def load_calib(self,calib_path,cid = 2): #cid: camera id, 2 for the left color camera
+    with open(calib_path, 'r') as f:
+      C = f.readlines() 
+    def parseLine(L, shape):
+      data = L.split()
+      data = np.array(data[1:]).reshape(shape).astype(np.float32)
+      return data
+
+    proj_c2p = parseLine(C[cid], shape=(3,4))
+    filler = np.array([0, 0, 0, 1]).reshape((1,4))
+    
+    #The above gives us both proj_c2p and proj_v2c 
+    intrinsics = proj_c2p[:3, :3] #This is our intrinsic parameters
+    #Here is what the parameters are:
+    #fx = intrinsics[0, 0]
+    #fy = intrinsics[1, 1]
+    #cx = intrinsics[0, 2]
+    #cy = intrinsics[1, 2]
+    return intrinsics 
 
   def load_label(self,label_path):
     return None
 
   def __len__(self):
     return len(self.data['image'])
-
 
 class Cars_3D(Dataset):
   def __init__(self,mode,data_path,device):
@@ -95,14 +109,16 @@ class Cars_3D(Dataset):
            
   def __getitem__(self,x):
     # Load the obj and ignore the textures and materials.
-    verts, faces_idx, _ = load_obj(self.data[x])
-    faces = faces_idx.verts_idx
+    #verts, faces_idx, _ = load_obj(self.data[x])
+    #faces = faces_idx.verts_idx
     # Initialize each vertex to be white in color.
-    verts_rgb = torch.ones_like(verts)[None]  # (1, V, 3)
-    textures = Textures(verts_rgb=verts_rgb.to(self.device))
-    mesh_obj= Meshes(verts=[verts.to(self.device)],faces=[faces.to(self.device)],textures=textures)
-    return mesh_obj
- 
+    #verts_rgb = torch.ones_like(verts)[None]  # (1, V, 3)
+    #textures = Textures(verts_rgb=verts_rgb.to(self.device))
+    #mesh_obj= Meshes(verts=[verts.to(self.device)],faces=[faces.to(self.device)],textures=textures)
+    #return mesh_obj
+    mesh = load_objs_as_meshes(files = [self.data[x]],device = self.device)
+    return mesh
+
   def __len__(self):
     return len(self.data)
 
