@@ -14,10 +14,6 @@ from pytorch3d.renderer import (
 from pytorch3d.renderer.cameras import (
     SfMPerspectiveCameras,
 )
-from pytorch_3d_add_ons import (
-  OpenGLRealPerspectiveCameras,
-)
-
 #Misc imports
 from utils import str_to_class
 import numpy as np

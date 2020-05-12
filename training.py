@@ -25,11 +25,11 @@ class Trainer():
 #      print(intrinsics)
       #setup the camera in forward call
       #silhouete = self.model(input_data)      
-      #self.model.visualize(inp = silhouete,save_dir = self.save_dir,idx = idx) 
+      #self.model.renderer.visualize(inp = silhouete,save_dir = self.save_dir,idx = idx) 
 
       label = input_data['label']
       out = self.model(im,intrinsics)
 
-      self.model.visualize(im,out,self.save_dir,idx)
+      self.model.backbone.visualize(im,out,self.save_dir,idx)
       #self.renderer.visualize(silhouete,image_ref,save_dir = 'rendered',idx = idx)
 
