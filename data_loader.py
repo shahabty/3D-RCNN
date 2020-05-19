@@ -35,7 +35,7 @@ class KITTI(Dataset):
     self.mode = mode
     self.data_path = data_path
     self.device = device
-    self.transform_gen = T.ResizeShortestEdge([800, 800], 1333)
+    self.transform_gen = T.ResizeShortestEdge([800., 800.], 1333.)
     self.data = dict()
         
     image_path = os.path.join(data_path,'data_object_image_2',mode + 'ing','image_2/')
@@ -59,18 +59,16 @@ class KITTI(Dataset):
       depth_data = [os.path.join(data_path,'depth_2_multiscale/') + s for s in sorted(depth_samples)]
       self.data['depth'] = depth_data
 
-    
-
   def __getitem__(self,idx):
     input_data = {'image':None,'depth':None,'height':None,'width':None,'calib':None,'label':None}
     image_path = self.data['image'][idx]
     calib_path = self.data['calib'][idx]
     image = cv2.imread(image_path)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = np.array(image)
     height, width = image.shape[:2]
     image = self.transform_gen.get_transform(image).apply_image(image)
-    input_data['image'] = image.transpose((2,0,1))
+    input_data['image'] = image.astype("float32").transpose((2,0,1))
     input_data['height'] = height
     input_data['width'] = width
 
@@ -82,10 +80,10 @@ class KITTI(Dataset):
       input_data['label'] =  self.load_label(label_path)
       #the depth is pre-processed, so we just load it from png format
       depth = cv2.imread(depth_path)
-      depth = cv2.cvtColor(depth,cv2.COLOR_BGR2RGB)
+      #depth = cv2.cvtColor(depth,cv2.COLOR_BGR2RGB)
       depth = np.array(depth)
       depth = self.transform_gen.get_transform(depth).apply_image(depth)
-      input_data['depth'] = depth.transpose((2,0,1))
+      input_data['depth'] = depth.astype("float32").transpose((2,0,1))
 
     filtered = {k: v for k, v in input_data.items() if v is not None}
     input_data.clear()

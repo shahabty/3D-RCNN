@@ -42,7 +42,7 @@ class Model(nn.Module):
   def forward(self,input_data):
     if self.backbone is not None: 
       out_batch = self.backbone(input_data)
-      H_inf = self.H_inf_computation(out_batch = out_batch,K_c_batch = input_data['calib'].to(self.device))
+      H_inf = self.H_inf_computation(out_batch = out_batch,input_data_batch = input_data)
       return H_inf
     #if self.pose_net is not None:
     #  pose_net_x = self.pose_net(x)
@@ -53,9 +53,10 @@ class Model(nn.Module):
     #  out = self.renderer.render(mesh = im,K = K_c_ndc)
     #return out
     
-  def H_inf_computation(self,out_batch,K_c_batch):
+  def H_inf_computation(self,out_batch,input_data_batch):
     H_inf = []
-    for out,K_c in zip(out_batch,K_c_batch):
+    for out,input_data in zip(out_batch,input_data_batch):
+      K_c = input_data['calib'].to(self.device)
       K_c = K_c.unsqueeze(0).repeat([out['instances'].pred_boxes.tensor.shape[0],1,1])
       R_c = self.R_c_computation(K_c = K_c,c = out['instances'].pred_boxes.get_centers())
       K_r = self.K_r_computation(K_c = K_c, B_ROI = out['instances'].pred_boxes ,ROI = out['instances'].pred_boxes)
@@ -126,15 +127,13 @@ class MaskRCNN(nn.Module):
     self.cfg.MODEL.META_ARCHITECTURE = 'RCNN'
     self.cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
     self.cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")
+
     self.cfg_clone = self.cfg.clone()  # cfg can be modified by model
     self.model = build_model(self.cfg_clone)
     self.model.eval()
     self.metadata = MetadataCatalog.get(self.cfg.DATASETS.TEST[0])
-
     checkpointer = DetectionCheckpointer(self.model)
     checkpointer.load(self.cfg.MODEL.WEIGHTS)
-    self.input_format = self.cfg.INPUT.FORMAT
-    assert self.input_format in ["RGB", "BGR"], self.input_format
 
     self.category_id = {0:'person',1:'bicycle',2:'car',3:'motorcycle',4:'airplane',5:'bus',6:'train',7:'truck'}
 
@@ -143,7 +142,7 @@ class MaskRCNN(nn.Module):
 
   def inference(self,input_data):
     with torch.no_grad():
-      predictions = self.model(input_data)[0]
+      predictions = self.model(input_data)
       return predictions
 
   def visualize(self,input_data_batch,out_batch,save_dir = None,idx = None):

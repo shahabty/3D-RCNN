@@ -167,10 +167,9 @@ class RCNN(nn.Module):
         else:
             detected_instances = [x.to(self.device) for x in detected_instances]
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
- 
- 
+
         if do_postprocess:
-            return RCNN._postprocess(features, results, proposals, batched_inputs, images.image_sizes)
+            return RCNN._postprocess(results, batched_inputs, images.image_sizes)
         else:
             return results
 
@@ -184,18 +183,69 @@ class RCNN(nn.Module):
         return images
 
     @staticmethod
-    def _postprocess(features, instances, proposals, batched_inputs, image_sizes):
+    def _postprocess(instances, batched_inputs, image_sizes):
         """
         Rescale the output instances to the target size.
         """
         # note: private function; subject to changes
         processed_results = []
-        for features_per_image,results_per_image, proposals_per_image, input_per_image, image_size in zip(
-            features, instances, proposals, batched_inputs, image_sizes
+        for results_per_image, input_per_image, image_size in zip(
+            instances, batched_inputs, image_sizes
         ):
             height = input_per_image.get("height", image_size[0])
             width = input_per_image.get("width", image_size[1])
             r = detector_postprocess(results_per_image, height, width)
-            processed_results.append({"instances": r,"features": features_per_image,"b_roi": proposals_per_image})
+            processed_results.append({"instances": r})
         return processed_results
 
+
+'''
+from detectron2.structures import Instances
+from detectron2.utils.memory import retry_if_cuda_oom
+from detectron2.layers import paste_masks_in_image
+
+def detector_postprocess(results, output_height, output_width, mask_threshold=0.5):
+    """
+    Resize the output instances.
+    The input images are often resized when entering an object detector.
+    As a result, we often need the outputs of the detector in a different
+    resolution from its inputs.
+    This function will resize the raw outputs of an R-CNN detector
+    to produce outputs according to the desired output resolution.
+    Args:
+        results (Instances): the raw outputs from the detector.
+            `results.image_size` contains the input image resolution the detector sees.
+            This object might be modified in-place.
+        output_height, output_width: the desired output resolution.
+    Returns:
+        Instances: the resized output from the model, based on the output resolution
+    """
+    print(output_width, results.image_size[1], float(output_width) / results.image_size[1])
+    scale_x, scale_y = (output_width / results.image_size[1], output_height / results.image_size[0])
+    print(scale_x,scale_y)
+    results = Instances((output_height, output_width), **results.get_fields())
+
+    if results.has("pred_boxes"):
+        output_boxes = results.pred_boxes
+    elif results.has("proposal_boxes"):
+        output_boxes = results.proposal_boxes
+
+    output_boxes.scale(scale_x, scale_y)
+    output_boxes.clip(results.image_size)
+
+    results = results[output_boxes.nonempty()]
+
+    if results.has("pred_masks"):
+        results.pred_masks = retry_if_cuda_oom(paste_masks_in_image)(
+            results.pred_masks[:, 0, :, :],  # N, 1, M, M
+            results.pred_boxes,
+            results.image_size,
+            threshold=mask_threshold,
+        )
+
+    if results.has("pred_keypoints"):
+        results.pred_keypoints[:, :, 0] *= scale_x
+        results.pred_keypoints[:, :, 1] *= scale_y
+
+    return results
+'''
