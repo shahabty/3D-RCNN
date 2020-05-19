@@ -142,7 +142,6 @@ class MaskRCNN(nn.Module):
     return self.inference(input_data)
 
   def inference(self,input_data):
-    print(input_data)
     with torch.no_grad():
       predictions = self.model(input_data)[0]
       return predictions
@@ -150,7 +149,6 @@ class MaskRCNN(nn.Module):
   def visualize(self,input_data_batch,out_batch,save_dir = None,idx = None):
     image_batch = input_data_batch['image']
     for j,(image,out) in enumerate(zip(image_batch,out_batch)):
-      print(out['instances'])
       v = Visualizer(image[:, :, ::-1], MetadataCatalog.get(self.cfg.DATASETS.TRAIN[0]), scale=1.2)
       v = v.draw_instance_predictions(out["instances"].to("cpu"))
       if save_dir is not None:

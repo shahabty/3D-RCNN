@@ -65,8 +65,9 @@ class KITTI(Dataset):
     input_data = {'image':None,'depth':None,'height':None,'width':None,'calib':None,'label':None}
     image_path = self.data['image'][idx]
     calib_path = self.data['calib'][idx]
-    image = np.array(cv2.imread(image_path))
+    image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = np.array(image)
     height, width = image.shape[:2]
     image = self.transform_gen.get_transform(image).apply_image(image)
     input_data['image'] = image.transpose((2,0,1))
@@ -80,7 +81,11 @@ class KITTI(Dataset):
       depth_path = self.data['depth'][idx]      
       input_data['label'] =  self.load_label(label_path)
       #the depth is pre-processed, so we just load it from png format
-      input_data['depth'] = np.array(cv2.imread(depth_path)).transpose((2,0,1))
+      depth = cv2.imread(depth_path)
+      depth = cv2.cvtColor(depth,cv2.COLOR_BGR2RGB)
+      depth = np.array(depth)
+      depth = self.transform_gen.get_transform(depth).apply_image(depth)
+      input_data['depth'] = depth.transpose((2,0,1))
 
     filtered = {k: v for k, v in input_data.items() if v is not None}
     input_data.clear()
