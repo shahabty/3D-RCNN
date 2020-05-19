@@ -43,7 +43,7 @@ class Model(nn.Module):
     if self.backbone is not None: 
       out_batch = self.backbone(input_data)
       H_inf = self.H_inf_computation(out_batch = out_batch,input_data_batch = input_data)
-      return H_inf
+      return out_batch
     #if self.pose_net is not None:
     #  pose_net_x = self.pose_net(x)
     #if self.shape_net is not None:
@@ -146,8 +146,8 @@ class MaskRCNN(nn.Module):
       return predictions
 
   def visualize(self,input_data_batch,out_batch,save_dir = None,idx = None):
-    image_batch = input_data_batch['image']
-    for j,(image,out) in enumerate(zip(image_batch,out_batch)):
+    for j,(input_data,out) in enumerate(zip(input_data_batch,out_batch)):
+      image = input_data['image'].permute(1,2,0).to("cpu").numpy() 
       v = Visualizer(image[:, :, ::-1], MetadataCatalog.get(self.cfg.DATASETS.TRAIN[0]), scale=1.2)
       v = v.draw_instance_predictions(out["instances"].to("cpu"))
       if save_dir is not None:

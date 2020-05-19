@@ -30,7 +30,7 @@ class Trainer():
       #silhouete = self.model(input_data)      
       #self.model.renderer.visualize(inp = silhouete,save_dir = self.save_dir,idx = idx) 
 
-      #self.model.backbone.visualize(input_data,out,self.save_dir,idx)
+      self.model.backbone.visualize(input_data,out,self.save_dir,idx)
 
 
 
