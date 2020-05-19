@@ -10,7 +10,7 @@ from detectron2.utils.logger import log_first_n
 
 from detectron2.modeling import META_ARCH_REGISTRY,build_roi_heads,build_proposal_generator,detector_postprocess,build_backbone
 
-__all__ = ["RCNN", "ProposalNetwork"]
+__all__ = ["RCNN"]
 
 
 @META_ARCH_REGISTRY.register()
@@ -168,10 +168,11 @@ class RCNN(nn.Module):
             detected_instances = [x.to(self.device) for x in detected_instances]
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
  
+ 
         if do_postprocess:
-            return features,proposals,RCNN._postprocess(results, batched_inputs, images.image_sizes)
+            return RCNN._postprocess(features, results, proposals, batched_inputs, images.image_sizes)
         else:
-            return features,proposals,results
+            return results
 
     def preprocess_image(self, batched_inputs):
         """
@@ -183,18 +184,18 @@ class RCNN(nn.Module):
         return images
 
     @staticmethod
-    def _postprocess(instances, batched_inputs, image_sizes):
+    def _postprocess(features, instances, proposals, batched_inputs, image_sizes):
         """
         Rescale the output instances to the target size.
         """
         # note: private function; subject to changes
         processed_results = []
-        for results_per_image, input_per_image, image_size in zip(
-            instances, batched_inputs, image_sizes
+        for features_per_image,results_per_image, proposals_per_image, input_per_image, image_size in zip(
+            features, instances, proposals, batched_inputs, image_sizes
         ):
             height = input_per_image.get("height", image_size[0])
             width = input_per_image.get("width", image_size[1])
             r = detector_postprocess(results_per_image, height, width)
-            processed_results.append({"instances": r})
+            processed_results.append({"instances": r,"features": features_per_image,"b_roi": proposals_per_image})
         return processed_results
 

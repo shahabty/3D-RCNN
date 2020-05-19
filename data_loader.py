@@ -11,6 +11,9 @@ import os
 import numpy as np
 import cv2
 
+#Detectron2 imports
+import detectron2.data.transforms as T
+
 #Pytorch3d imports
 from pytorch3d.io import load_obj,load_objs_as_meshes
 from pytorch3d.structures import Meshes, Textures
@@ -32,6 +35,7 @@ class KITTI(Dataset):
     self.mode = mode
     self.data_path = data_path
     self.device = device
+    self.transform_gen = T.ResizeShortestEdge([800, 800], 1333)
     self.data = dict()
         
     image_path = os.path.join(data_path,'data_object_image_2',mode + 'ing','image_2/')
@@ -53,13 +57,22 @@ class KITTI(Dataset):
       depth_path = os.path.join(data_path,'depth_2_multiscale/')
       depth_samples = os.listdir(depth_path)
       depth_data = [os.path.join(data_path,'depth_2_multiscale/') + s for s in sorted(depth_samples)]
-      self.data['depth'] = depth_data    
+      self.data['depth'] = depth_data
+
+    
 
   def __getitem__(self,idx):
-    input_data = {'image':None,'depth':None,'calib':None,'label':None}
+    input_data = {'image':None,'depth':None,'height':None,'width':None,'calib':None,'label':None}
     image_path = self.data['image'][idx]
     calib_path = self.data['calib'][idx]
-    input_data['image'] = torch.from_numpy(np.array(cv2.imread(image_path)))#.permute(2,0,1)
+    image = np.array(cv2.imread(image_path))
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    height, width = image.shape[:2]
+    image = self.transform_gen.get_transform(image).apply_image(image)
+    input_data['image'] = image.transpose((2,0,1))
+    input_data['height'] = height
+    input_data['width'] = width
+
     input_data['calib'] = self.load_calib(calib_path)
 
     if self.mode == 'train':
@@ -67,7 +80,11 @@ class KITTI(Dataset):
       depth_path = self.data['depth'][idx]      
       input_data['label'] =  self.load_label(label_path)
       #the depth is pre-processed, so we just load it from png format
-      input_data['depth'] = torch.from_numpy(np.array(cv2.imread(depth_path)))#.permute(2,0,1)
+      input_data['depth'] = np.array(cv2.imread(depth_path)).transpose((2,0,1))
+
+    filtered = {k: v for k, v in input_data.items() if v is not None}
+    input_data.clear()
+    input_data.update(filtered)
     return input_data
 
   def load_calib(self,calib_path,cid = 2): #cid: camera id, 2 for the left color camera
