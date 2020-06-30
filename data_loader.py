@@ -3,21 +3,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+from torchvision.transforms import transforms
 
 #Misc imports
 import matplotlib.pyplot as plt
 import logging
 import os
 import numpy as np
-import cv2
-
-#Detectron2 imports
-import detectron2.data.transforms as T
-
-#Pytorch3d imports
-from pytorch3d.io import load_obj,load_objs_as_meshes
-from pytorch3d.structures import Meshes, Textures
-from pytorch3d.transforms import Rotate, Translate
+from PIL import Image 
 
 #Local imports
 from utils import str_to_class
@@ -30,12 +23,37 @@ def get_dataset(name,mode,data_path,device):
   return instance or None
 
 
+class HIGHWAY(Dataset):
+  def __init__(self,mode,data_path,device):
+    self.mode = mode
+    self.data_path = data_path
+    self.device = device
+    self.transform = transforms.Compose([
+        transforms.Resize((375,1242), interpolation=2),
+        transforms.ToTensor()])
+    self.data = dict()
+
+    image_path = os.path.join(data_path,'test/')
+    image_samples = os.listdir(image_path)
+    image_data = [os.path.join(data_path,'test/') + s for s in sorted(image_samples) if s.endswith('.png')]
+    self.data['image'] = sorted(image_data)
+  def __getitem__(self,idx):
+    input_data = {'image':None}
+    image_path = self.data['image'][idx]
+    input_data['image'] = self.transform(Image.open(image_path).convert("RGB"))
+    return input_data
+
+  def __len__(self):
+    return len(self.data['image'])
+
 class KITTI(Dataset):
   def __init__(self,mode,data_path,device):
     self.mode = mode
     self.data_path = data_path
     self.device = device
-    self.transform_gen = T.ResizeShortestEdge([800., 800.], 1333.)
+    self.transform = transforms.Compose([
+        transforms.Resize((375,1242), interpolation=2),
+        transforms.ToTensor()])
     self.data = dict()
         
     image_path = os.path.join(data_path,'data_object_image_2',mode + 'ing','image_2/')
@@ -63,15 +81,7 @@ class KITTI(Dataset):
     input_data = {'image':None,'depth':None,'height':None,'width':None,'calib':None,'label':None}
     image_path = self.data['image'][idx]
     calib_path = self.data['calib'][idx]
-    image = cv2.imread(image_path)
-    #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = np.array(image)
-    height, width = image.shape[:2]
-    image = self.transform_gen.get_transform(image).apply_image(image)
-    input_data['image'] = image.astype("float32").transpose((2,0,1))
-    input_data['height'] = height
-    input_data['width'] = width
-
+    input_data['image'] = self.transform(Image.open(image_path).convert("RGB"))
     input_data['calib'] = self.load_calib(calib_path)
 
     if self.mode == 'train':
@@ -79,12 +89,7 @@ class KITTI(Dataset):
       depth_path = self.data['depth'][idx]      
       input_data['label'] =  self.load_label(label_path)
       #the depth is pre-processed, so we just load it from png format
-      depth = cv2.imread(depth_path)
-      #depth = cv2.cvtColor(depth,cv2.COLOR_BGR2RGB)
-      depth = np.array(depth)
-      depth = self.transform_gen.get_transform(depth).apply_image(depth)
-      input_data['depth'] = depth.astype("float32").transpose((2,0,1))
-
+      input_data['depth'] = self.transform(Image.open(depth_path))
     filtered = {k: v for k, v in input_data.items() if v is not None}
     input_data.clear()
     input_data.update(filtered)
@@ -115,30 +120,3 @@ class KITTI(Dataset):
 
   def __len__(self):
     return len(self.data['image'])
-
-class Cars_3D(Dataset):
-  def __init__(self,mode,data_path,device):
-    self.mode = mode
-    self.data_path = data_path
-    self.device = device
-    self.data = []
-    for c in os.listdir(data_path):
-      for f in os.listdir(os.path.join(data_path,c)):
-        if f.endswith(".obj"):
-          self.data.append(os.path.join(data_path,c,f)) 
-           
-  def __getitem__(self,x):
-    # Load the obj and ignore the textures and materials.
-    #verts, faces_idx, _ = load_obj(self.data[x])
-    #faces = faces_idx.verts_idx
-    # Initialize each vertex to be white in color.
-    #verts_rgb = torch.ones_like(verts)[None]  # (1, V, 3)
-    #textures = Textures(verts_rgb=verts_rgb.to(self.device))
-    #mesh_obj= Meshes(verts=[verts.to(self.device)],faces=[faces.to(self.device)],textures=textures)
-    #return mesh_obj
-    mesh = load_objs_as_meshes(files = [self.data[x]],device = self.device)
-    return mesh
-
-  def __len__(self):
-    return len(self.data)
-

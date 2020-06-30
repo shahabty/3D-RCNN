@@ -22,10 +22,10 @@ def str_to_class(name,module_name):
     logging.error('Module does not exist!')
   return class_ or None
 
-def collate_fn(batch):
-  for i in range(2):
-    batch[i] = {k:torch.as_tensor(v) for k,v in batch[i].items() if k != 'height' and k!= 'width'}      
-  return batch
+#def collate_fn(batch):
+#  for i in range(2):
+#    batch[i] = {k:torch.as_tensor(v) for k,v in batch[i].items() if k != 'height' and k!= 'width'}      
+#  return batch
 
 #batch size more than 1 must be implemented here
 #def collate_fn_3D(batch):

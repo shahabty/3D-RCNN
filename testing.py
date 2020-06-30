@@ -18,7 +18,7 @@ class Tester():
     self.writer = SummaryWriter()
   def run(self):
     for idx, input_data in tqdm(enumerate(self.test_loader)):
+#      print(input_data)
       out = self.model(input_data)
-      self.model.backbone.visualize(input_data,out,self.save_dir,idx)
-
+      self.model.backbone_visualization(input_data = input_data, predicted = out,save_dir = self.save_dir,idx = idx)      
       #self.renderer.visualize(silhouete,image_ref,save_dir = 'rendered',idx = idx)
