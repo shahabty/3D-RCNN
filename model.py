@@ -10,6 +10,7 @@ from utils import str_to_class
 import os 
 import numpy as np
 import cv2
+import h5py
 
 #imports
 from visualization import select_top_predictions, overlay_boxes,overlay_mask,overlay_keypoints, overlay_class_names
@@ -17,8 +18,8 @@ from visualization import select_top_predictions, overlay_boxes,overlay_mask,ove
 def get_model(renderer,cfg,mode,device = None):
   model = cfg[mode]['model']
   class_backbone = str_to_class(model['backbone'],'model')
-  class_pose = str_to_class(model['pose_net'],'model')
-  class_shape = str_to_class(model['shape_net'],'model')
+  class_pose = str_to_class(model['PoseNet'],'model')
+  class_shape = str_to_class(model['ShapeNet'],'model')
 
   backbone = class_backbone(cfg,mode,device) if class_backbone is not None else None
   pose_net = class_pose(cfg,mode,device) if class_pose is not None else None
@@ -39,19 +40,19 @@ class Model(nn.Module):
 
   def forward(self,input_data):
     input_data = {k:v.to(self.device) for k,v in input_data.items()}
-    if self.backbone is not None: 
-      features,bboxes = self.backbone(input_data)
+    if self.backbone is not None:
+      detections = self.backbone(input_data)
       #H_inf = self.H_inf_computation(out_batch = out_batch,input_data_batch = input_data)
-      #return output
+      #features = fuse(H_inf,features)
     if self.pose_net is not None:
-      pose_net_x = self.pose_net(features,input_data)
+      pose_net_x = self.pose_net(detections)
     if self.shape_net is not None:
-     shape_net_x = self.shape_net(x)
+     3d_shapes_voxels = self.shape_net(detections)
     if self.renderer is not None:
       K_c_ndc = self.K_to_ndc(K = K_c,image_h = im.shape[0],image_w = im.shape[1])
       out = self.renderer.render(mesh = im,K = K_c_ndc)
     return out
-    
+   
   def H_inf_computation(self,out_batch,input_data_batch):
     H_inf = []
     for out,input_data in zip(out_batch,input_data_batch):
@@ -125,17 +126,20 @@ class Model(nn.Module):
 
 class ShapeNet(nn.Module):
   def __init__(self,cfg,mode,device):
+    super(ShapeNet,self).__init__()
     self.cfg = cfg
     self.device = device
     self.mode = mode
-    self.nn = 
-    self.pca = h5py.File(,'r')['tsdf_basis'][()]
-
-  def forward(self,object_feature,input_data):
+    self.fc_net = nn.Sequential(nn.Linear(12544,1254),nn.Linear(1254,10)).to(device)
+    self.pca = torch.from_numpy(h5py.File(cfg[mode]['pretrained']['tsdf_basis'],'r')['tsdf_basis'][()]).to(self.device)
+    self.pca = self.pca.unsqueeze(0).repeat(80,1,1,1,1)
+  def forward(self,detections,input_data):
+    out = []
+    for d in detections:
+      temp = self.fc_net(torch.flatten(d['instance_features'],start_dim = 1))
+      out.append(torch.sum(self.pca*temp.unsqueeze(1).unsqueeze(1).unsqueeze(1).repeat(1,128,67,63,1),dim = -1))
     
-
-
-
+    return out
 
 
 class MaskRCNN(nn.Module):
@@ -144,7 +148,7 @@ class MaskRCNN(nn.Module):
     self.cfg = cfg
     self.device = device
     self.mode = mode
-    if cfg[mode]['backbone']['pretrained'] is None:
+    if cfg[mode]['pretrained']['backbone'] is None:
       model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
     else:
       model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=False)
@@ -155,7 +159,7 @@ class MaskRCNN(nn.Module):
     self.rpn = model.rpn #this is the predicted bounding boxes before ROIalign
     self.box_roi_pool = model.roi_heads.box_roi_pool
     self.roi_heads = model.roi_heads #these are our outputs
-#    print(self.roi_heads)
+
   def forward(self,input_data):
     if self.mode == 'train':
       images,targets = input_data['image'],input_data['target']
@@ -198,19 +202,22 @@ class MaskRCNN(nn.Module):
     if isinstance(features, torch.Tensor):
       features = OrderedDict([('0', features)])
     proposals, proposal_losses = self.rpn(images, features, targets)
-    pre_roi_proposals = proposals
-    post_roi_proposals = self.box_roi_pool(features,proposals,images.image_sizes)
     detections, detector_losses = self.roi_heads(features, proposals, images.image_sizes, targets)
     detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
-    pre_roi_proposals = torch.cat(pre_roi_proposals)
-    #print(pre_roi_proposals[0].shape)
-    #print(post_roi_proposals[0].shape)
-    #print(detections)
+    verified_proposals = []
+    
+    for d in detections:
+      verified_proposals.append(d['boxes'])
+    instance_features = self.box_roi_pool(features,verified_proposals,images.image_sizes)
+    instance_features = torch.split(instance_features,80,dim = 0)
+    
     if self.mode == 'train':
       losses = {}
       losses.update(detector_losses)
       losses.update(proposal_losses)
       return losses
+    for i in range(len(instance_features)):
+      detections[i]['instance_features'] = instance_features[i]
     return detections
 
   def visualization(self,img,result,is_mask,is_bbox,is_keypoint,save_dir,idx):
